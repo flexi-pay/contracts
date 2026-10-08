@@ -1,0 +1,17 @@
+[package]
+name = "flexipay-escrow"
+version = "0.1.0"
+edition = "2021"
+description = "Soroban escrow for Starling: lock tokens for a seller, release on delivery, refund after a deadline."
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
