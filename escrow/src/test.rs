@@ -56,3 +56,32 @@ fn validates_inputs() {
     assert!(s.client.try_create(&s.buyer, &s.seller, t, &5_000, &2_000, &m).is_err());
     assert_eq!(s.client.count(), 0);
 }
+
+#[test]
+fn create_locks_funds_and_release_pays_seller() {
+    let s = setup();
+    let id = s.client.create(&s.buyer, &s.seller, &s.token.address, &400, &2_000, &memo(&s.env, "Phone"));
+    assert_eq!(id, 1);
+    assert_eq!(s.token.balance(&s.buyer), 600);
+    assert_eq!(s.token.balance(&s.client.address), 400);
+
+    let e = s.client.get(&id);
+    assert_eq!(e.status, Status::Funded);
+    assert_eq!(e.amount, 400);
+    assert_eq!(e.created_at, 1_000);
+
+    s.client.release(&id);
+    assert_eq!(s.token.balance(&s.seller), 400);
+    assert_eq!(s.token.balance(&s.client.address), 0);
+    assert_eq!(s.client.get(&id).status, Status::Released);
+}
+
+#[test]
+fn release_requires_buyer_auth() {
+    let s = setup();
+    let id = s.client.create(&s.buyer, &s.seller, &s.token.address, &100, &2_000, &memo(&s.env, ""));
+    s.client.release(&id);
+    let auths = s.env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, s.buyer);
+}

@@ -162,6 +162,19 @@ impl EscrowContract {
         id
     }
 
+    /// Buyer confirms delivery: funds go to the seller.
+    pub fn release(env: Env, id: u64) {
+        let mut e = load(&env, id);
+        e.buyer.require_auth();
+        if e.status != Status::Funded {
+            panic_with_error!(&env, Error::NotFunded);
+        }
+        e.status = Status::Released;
+        save(&env, &e); // state change before the external call
+        token::Client::new(&env, &e.token).transfer(&env.current_contract_address(), &e.seller, &e.amount);
+        Released { id, seller: e.seller.clone(), amount: e.amount }.publish(&env);
+    }
+
     pub fn get(env: Env, id: u64) -> Escrow {
         load(&env, id)
     }
