@@ -114,6 +114,54 @@ fn save(env: &Env, e: &Escrow) {
 
 #[contractimpl]
 impl EscrowContract {
+    /// Buyer locks `amount` of `token` for `seller` until released or refunded. Returns the escrow id.
+    pub fn create(
+        env: Env,
+        buyer: Address,
+        seller: Address,
+        token: Address,
+        amount: i128,
+        deadline: u64,
+        memo: String,
+    ) -> u64 {
+        buyer.require_auth();
+        if amount <= 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        if buyer == seller {
+            panic_with_error!(&env, Error::SameParty);
+        }
+        let now = env.ledger().timestamp();
+        if deadline <= now {
+            panic_with_error!(&env, Error::InvalidDeadline);
+        }
+        if memo.len() > MAX_MEMO_LEN {
+            panic_with_error!(&env, Error::MemoTooLong);
+        }
+
+        // Pull funds into the contract first; fails atomically if the buyer can't pay.
+        token::Client::new(&env, &token).transfer(&buyer, env.current_contract_address(), &amount);
+
+        let id: u64 = env.storage().instance().get(&DataKey::Count).unwrap_or(0) + 1;
+        env.storage().instance().set(&DataKey::Count, &id);
+        env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
+
+        let e = Escrow {
+            id,
+            buyer: buyer.clone(),
+            seller: seller.clone(),
+            token: token.clone(),
+            amount,
+            deadline,
+            created_at: now,
+            status: Status::Funded,
+            memo,
+        };
+        save(&env, &e);
+        Created { id, buyer, seller, token, amount, deadline }.publish(&env);
+        id
+    }
+
     pub fn get(env: Env, id: u64) -> Escrow {
         load(&env, id)
     }
@@ -122,3 +170,6 @@ impl EscrowContract {
         env.storage().instance().get(&DataKey::Count).unwrap_or(0)
     }
 }
+
+#[cfg(test)]
+mod test;
