@@ -102,14 +102,18 @@ fn load(env: &Env, id: u64) -> Escrow {
         .persistent()
         .get(&key)
         .unwrap_or_else(|| panic_with_error!(env, Error::NotFound));
-    env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
     e
 }
 
 fn save(env: &Env, e: &Escrow) {
     let key = DataKey::Escrow(e.id);
     env.storage().persistent().set(&key, e);
-    env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
 }
 
 #[contractimpl]
@@ -144,7 +148,9 @@ impl EscrowContract {
 
         let id: u64 = env.storage().instance().get(&DataKey::Count).unwrap_or(0) + 1;
         env.storage().instance().set(&DataKey::Count, &id);
-        env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage()
+            .instance()
+            .extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
 
         let e = Escrow {
             id,
@@ -158,7 +164,15 @@ impl EscrowContract {
             memo,
         };
         save(&env, &e);
-        Created { id, buyer, seller, token, amount, deadline }.publish(&env);
+        Created {
+            id,
+            buyer,
+            seller,
+            token,
+            amount,
+            deadline,
+        }
+        .publish(&env);
         id
     }
 
@@ -171,8 +185,17 @@ impl EscrowContract {
         }
         e.status = Status::Released;
         save(&env, &e); // state change before the external call
-        token::Client::new(&env, &e.token).transfer(&env.current_contract_address(), &e.seller, &e.amount);
-        Released { id, seller: e.seller.clone(), amount: e.amount }.publish(&env);
+        token::Client::new(&env, &e.token).transfer(
+            &env.current_contract_address(),
+            &e.seller,
+            &e.amount,
+        );
+        Released {
+            id,
+            seller: e.seller.clone(),
+            amount: e.amount,
+        }
+        .publish(&env);
     }
 
     /// Returns funds to the buyer. The seller may do this any time;
@@ -192,8 +215,18 @@ impl EscrowContract {
         }
         e.status = Status::Refunded;
         save(&env, &e);
-        token::Client::new(&env, &e.token).transfer(&env.current_contract_address(), &e.buyer, &e.amount);
-        Refunded { id, buyer: e.buyer.clone(), amount: e.amount, by: caller }.publish(&env);
+        token::Client::new(&env, &e.token).transfer(
+            &env.current_contract_address(),
+            &e.buyer,
+            &e.amount,
+        );
+        Refunded {
+            id,
+            buyer: e.buyer.clone(),
+            amount: e.amount,
+            by: caller,
+        }
+        .publish(&env);
     }
 
     pub fn get(env: Env, id: u64) -> Escrow {
@@ -207,11 +240,19 @@ impl EscrowContract {
     /// Newest-first page of escrows, starting at id `before` (exclusive; 0 = from the latest).
     pub fn list(env: Env, before: u64, limit: u32) -> Vec<Escrow> {
         let count: u64 = env.storage().instance().get(&DataKey::Count).unwrap_or(0);
-        let mut id = if before == 0 || before > count + 1 { count } else { before - 1 };
+        let mut id = if before == 0 || before > count + 1 {
+            count
+        } else {
+            before - 1
+        };
         let limit = limit.min(MAX_LIST);
         let mut out = Vec::new(&env);
         while id > 0 && out.len() < limit {
-            if let Some(e) = env.storage().persistent().get::<_, Escrow>(&DataKey::Escrow(id)) {
+            if let Some(e) = env
+                .storage()
+                .persistent()
+                .get::<_, Escrow>(&DataKey::Escrow(id))
+            {
                 out.push_back(e);
             }
             id -= 1;
