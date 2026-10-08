@@ -123,3 +123,20 @@ fn validates_inputs() {
     assert!(s.client.try_create(&s.buyer, &s.seller, t, &5_000, &2_000, &m).is_err());
     assert_eq!(s.client.count(), 0);
 }
+
+#[test]
+fn list_is_newest_first_and_paginates() {
+    let s = setup();
+    for i in 0..5 {
+        s.client.create(&s.buyer, &s.seller, &s.token.address, &(10 + i), &2_000, &memo(&s.env, ""));
+    }
+    assert_eq!(s.client.count(), 5);
+    let page = s.client.list(&0, &2);
+    assert_eq!(page.len(), 2);
+    assert_eq!(page.get(0).unwrap().id, 5);
+    assert_eq!(page.get(1).unwrap().id, 4);
+    let next = s.client.list(&4, &10);
+    assert_eq!(next.len(), 3);
+    assert_eq!(next.get(0).unwrap().id, 3);
+    assert_eq!(next.get(2).unwrap().id, 1);
+}

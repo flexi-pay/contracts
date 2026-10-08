@@ -203,6 +203,21 @@ impl EscrowContract {
     pub fn count(env: Env) -> u64 {
         env.storage().instance().get(&DataKey::Count).unwrap_or(0)
     }
+
+    /// Newest-first page of escrows, starting at id `before` (exclusive; 0 = from the latest).
+    pub fn list(env: Env, before: u64, limit: u32) -> Vec<Escrow> {
+        let count: u64 = env.storage().instance().get(&DataKey::Count).unwrap_or(0);
+        let mut id = if before == 0 || before > count + 1 { count } else { before - 1 };
+        let limit = limit.min(MAX_LIST);
+        let mut out = Vec::new(&env);
+        while id > 0 && out.len() < limit {
+            if let Some(e) = env.storage().persistent().get::<_, Escrow>(&DataKey::Escrow(id)) {
+                out.push_back(e);
+            }
+            id -= 1;
+        }
+        out
+    }
 }
 
 #[cfg(test)]
