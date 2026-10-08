@@ -220,3 +220,30 @@ fn list_is_newest_first_and_paginates() {
     assert_eq!(next.get(0).unwrap().id, 3);
     assert_eq!(next.get(2).unwrap().id, 1);
 }
+
+#[test]
+fn emits_events_for_indexers() {
+    use soroban_sdk::testutils::Events as _;
+    let s = setup();
+    let id = s.client.create(
+        &s.buyer,
+        &s.seller,
+        &s.token.address,
+        &100,
+        &2_000,
+        &memo(&s.env, ""),
+    );
+    let from_escrow = s.env.events().all().filter_by_contract(&s.client.address);
+    assert_eq!(
+        from_escrow.events().len(),
+        1,
+        "create emits one escrow event"
+    );
+    s.client.release(&id);
+    let from_escrow = s.env.events().all().filter_by_contract(&s.client.address);
+    assert_eq!(
+        from_escrow.events().len(),
+        1,
+        "release emits one escrow event"
+    );
+}
