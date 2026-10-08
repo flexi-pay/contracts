@@ -175,6 +175,27 @@ impl EscrowContract {
         Released { id, seller: e.seller.clone(), amount: e.amount }.publish(&env);
     }
 
+    /// Returns funds to the buyer. The seller may do this any time;
+    /// the buyer only after the deadline has passed.
+    pub fn refund(env: Env, id: u64, caller: Address) {
+        caller.require_auth();
+        let mut e = load(&env, id);
+        if e.status != Status::Funded {
+            panic_with_error!(&env, Error::NotFunded);
+        }
+        if caller == e.buyer {
+            if env.ledger().timestamp() < e.deadline {
+                panic_with_error!(&env, Error::TooEarly);
+            }
+        } else if caller != e.seller {
+            panic_with_error!(&env, Error::NotAllowed);
+        }
+        e.status = Status::Refunded;
+        save(&env, &e);
+        token::Client::new(&env, &e.token).transfer(&env.current_contract_address(), &e.buyer, &e.amount);
+        Refunded { id, buyer: e.buyer.clone(), amount: e.amount, by: caller }.publish(&env);
+    }
+
     pub fn get(env: Env, id: u64) -> Escrow {
         load(&env, id)
     }
